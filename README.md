@@ -16,3 +16,4 @@ Esta aplicación Flask proporciona una interfaz web para migrar correos electró
 - `imapsync`
 - Docker (opcional, para ejecutar la aplicación en un contenedor)
 
+![image](https://github.com/CarlosSuarezCWH/MigrationToolImapsync/assets/115673584/441ea553-5755-42a9-98bb-7942c4b6be3a)
