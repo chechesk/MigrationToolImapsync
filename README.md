@@ -31,3 +31,8 @@ Esta es una aplicación web construida con Flask que permite la migración de co
 
    Abre tu navegador y navega a http://localhost:5000 para acceder a la interfaz de la aplicación.
 
+
+![image](https://github.com/user-attachments/assets/d19a6bea-c9e9-48ea-ae08-4bc47990c074)
+
+
+![image](https://github.com/user-attachments/assets/b7e95795-5616-41aa-bb50-4f7ed543a427)
