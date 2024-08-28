@@ -1,19 +1,33 @@
-# MigrationToolImapsync
-Esta aplicación Flask proporciona una interfaz web para migrar correos electrónicos de un servidor de origen a un servidor de destino utilizando la herramienta imapsync.
+# Herramienta de Migración de Correo Electrónico con Flask e Imapsync
 
+Esta es una aplicación web construida con Flask que permite la migración de correos electrónicos entre servidores IMAP utilizando `imapsync`. La aplicación soporta múltiples migraciones simultáneas y permite ver el progreso de cada migración en tiempo real desde la interfaz web.
 
 ## Características
 
-- Interfaz web intuitiva para ingresar los detalles de los servidores de origen y destino, así como las credenciales de acceso.
-- Opción para especificar si se debe usar SSL en los servidores de origen y destino.
-- Validación de los datos ingresados para garantizar una migración segura y confiable.
-- Retroalimentación en tiempo real sobre el progreso y el resultado de la migración.
+- **Migración de correos electrónicos** entre dos servidores IMAP utilizando `imapsync`.
+- **Soporte para múltiples migraciones** simultáneas.
+- **Visualización del log en tiempo real** de cada migración directamente desde la interfaz web.
+- **Persistencia de migraciones**: puedes ver y continuar monitoreando las migraciones activas incluso si cierras y vuelves a abrir la página.
 
 ## Requisitos
 
-- Python 3.x
-- Flask
-- `imapsync`
-- Docker (opcional, para ejecutar la aplicación en un contenedor)
+- **Docker**: para ejecutar la aplicación en un contenedor.
+- **Python 3**: si prefieres ejecutar la aplicación localmente sin Docker.
+- **Perl**: requerido para ejecutar `imapsync` junto con las dependencias necesarias.
 
-![image](https://github.com/CarlosSuarezCWH/MigrationToolImapsync/assets/115673584/441ea553-5755-42a9-98bb-7942c4b6be3a)
+## Configuración y Ejecución
+
+### Usando Docker
+
+1. **Construir la Imagen Docker**:
+
+   ```bash
+   docker build -t migration-tool .
+   
+2. **Ejecutar el Contenedorr**:
+   ```bash
+    docker run -p 5000:5000 migration-tool
+3. **Acceder a la Aplicación**:
+
+   Abre tu navegador y navega a http://localhost:5000 para acceder a la interfaz de la aplicación.
+
