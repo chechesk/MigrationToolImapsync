@@ -1,16 +1,16 @@
-# Utiliza una imagen base de Ubuntu
-FROM ubuntu:20.04
+# Utiliza una imagen base más liviana
+FROM python:3.9-slim
 
 # Establece el directorio de trabajo
 WORKDIR /app
 
-# Configura las variables de entorno para que no haya prompts interactivos
-ENV DEBIAN_FRONTEND=noninteractive
+# Configura las variables de entorno para que no haya prompts interactivos y para Python
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Actualiza el sistema e instala las dependencias necesarias
+# Actualiza el sistema e instala las dependencias necesarias para imapsync
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    python3-pip \
     libauthen-ntlm-perl \
     libclass-load-perl \
     libcrypt-openssl-rsa-perl \
@@ -58,17 +58,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copia el archivo de requisitos y la aplicación al contenedor
+# Copia el archivo de requisitos de Python
 COPY myapp/requirements.txt /app/requirements.txt
-COPY myapp /app
 
 # Instala las dependencias de Python
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+# Copia la aplicación al contenedor
+COPY myapp /app
+
 # Define variables de entorno para Flask
-ENV FLASK_APP=app.py
-ENV FLASK_RUN_HOST=0.0.0.0
-ENV FLASK_RUN_PORT=5000
+ENV FLASK_APP=app.py \
+    FLASK_RUN_HOST=0.0.0.0 \
+    FLASK_RUN_PORT=5000
 
 # Expone el puerto en el que Flask se ejecutará
 EXPOSE 5000
