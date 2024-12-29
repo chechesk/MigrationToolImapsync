@@ -5,28 +5,74 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Migración de correo electrónico</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script>
+        // Detectar puertos automáticamente para ambos servidores
+        function detectPortsBoth() {
+            const srcHost = $("#src_host").val();
+            const dstHost = $("#dst_host").val();
+
+            if (!srcHost || !dstHost) {
+                alert("Por favor, ingrese ambos servidores antes de detectar los puertos.");
+                return;
+            }
+
+            $("#loading_spinner").removeClass("d-none"); // Mostrar spinner
+
+            $.ajax({
+                url: "/detect_ports",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({ src_host: srcHost, dst_host: dstHost }),
+                success: function(response) {
+                    if (response.src_ssl) {
+                        $("#src_port").val(response.src_ssl);
+                    } else if (response.src_non_ssl) {
+                        $("#src_port").val(response.src_non_ssl);
+                    } else {
+                        alert("No se pudieron detectar los puertos del servidor de origen.");
+                    }
+
+                    if (response.dst_ssl) {
+                        $("#dst_port").val(response.dst_ssl);
+                    } else if (response.dst_non_ssl) {
+                        $("#dst_port").val(response.dst_non_ssl);
+                    } else {
+                        alert("No se pudieron detectar los puertos del servidor de destino.");
+                    }
+                },
+                error: function(error) {
+                    alert("Error detectando puertos: " + JSON.stringify(error.responseJSON));
+                },
+                complete: function() {
+                    $("#loading_spinner").addClass("d-none"); // Ocultar spinner
+                }
+            });
+        }
+
         function startMigration() {
             $.ajax({
                 url: "/migrate",
                 method: "POST",
                 data: {
                     src_host: $("#src_host").val(),
+                    src_port: $("#src_port").val(),
                     src_user: $("#src_user").val(),
                     src_password: $("#src_password").val(),
-                    src_use_ssl: $("#src_use_ssl").is(":checked"),
+                    src_encryption: $("#src_encryption").val(),
                     dst_host: $("#dst_host").val(),
+                    dst_port: $("#dst_port").val(),
                     dst_user: $("#dst_user").val(),
                     dst_password: $("#dst_password").val(),
-                    dst_use_ssl: $("#dst_use_ssl").is(":checked")
+                    dst_encryption: $("#dst_encryption").val()
                 },
                 success: function(response) {
                     $("#migration_id").text("ID de la migración: " + response.migration_id);
                     addMigrationToList(response.migration_id);
                 },
                 error: function(error) {
-                    $("#progress_text").text("Error: " + error.responseText);
+                    $("#progress_text").text("Error: " + JSON.stringify(error.responseJSON));
                 }
             });
         }
@@ -41,126 +87,186 @@
         }
 
         function trackMigration(migration_id) {
-            $("#progress_text").html(''); // Limpia el log anterior
-            const eventSource = new EventSource("/migration_log/" + migration_id);
+            // Mostrar la sección de logs y actualizar el encabezado
+            $("#log_section").removeClass("d-none");
+            $("#log_header").text(`Progreso de la migración: ${migration_id}`);
 
-            eventSource.onmessage = function(event) {
-                $("#progress_text").append(event.data + "<br>");
-                if (event.data.includes("completed") || event.data.includes("error")) {
+            // Limpiar logs anteriores
+            $("#log_container").html('');
+
+            const eventSource = new EventSource(`/migration_log/${migration_id}`);
+
+            eventSource.onmessage = function (event) {
+                const logLine = event.data;
+
+                // Agregar color según el contenido del log
+                let logClass = "text-secondary"; // Por defecto
+                if (logLine.toLowerCase().includes("error")) {
+                    logClass = "text-danger";
+                } else if (logLine.toLowerCase().includes("warning")) {
+                    logClass = "text-warning";
+                } else if (logLine.toLowerCase().includes("success") || logLine.toLowerCase().includes("completed")) {
+                    logClass = "text-success";
+                }
+
+                // Agregar la línea de log al contenedor
+                $("#log_container").append(`<div class="${logClass}">${logLine}</div>`);
+
+                // Desplazar automáticamente hacia abajo
+                $("#log_container").scrollTop($("#log_container")[0].scrollHeight);
+
+                // Cerrar la conexión si el proceso ha terminado
+                if (logLine.toLowerCase().includes("completed") || logLine.toLowerCase().includes("error")) {
                     eventSource.close();
                 }
             };
 
-            eventSource.onerror = function() {
-                $("#progress_text").text("Error en la conexión con el servidor.");
+            eventSource.onerror = function () {
+                $("#log_container").append('<div class="text-danger">Error en la conexión con el servidor.</div>');
                 eventSource.close();
             };
         }
 
-        function loadMigrations() {
-            $.ajax({
-                url: "/migration_status",
-                method: "GET",
-                success: function(data) {
-                    for (const migration_id in data) {
-                        addMigrationToList(migration_id);
-                    }
-                }
-            });
-        }
-
         $(document).ready(function() {
-            loadMigrations();
             $("#migrate_button").click(startMigration);
         });
     </script>
     <style>
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin-top: 50px;
         }
-        .form-group {
-            margin-bottom: 1.5rem;
+        .form-group i {
+            position: absolute;
+            top: 38px;
+            left: 10px;
+            color: #888;
         }
-        .progress {
-            margin-top: 20px;
-            display: none;
+        .form-control {
+            padding-left: 35px;
         }
-        #progress_text {
-            margin-top: 10px;
-            white-space: pre-wrap; /* Mantiene el formato de las líneas del log */
+        #log_container {
+            font-family: monospace;
             background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 5px;
             border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            overflow-y: auto;
+            max-height: 300px;
         }
-        #migration_list {
-            margin-top: 20px;
+        .spinner-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="text-center">Migración de correo electrónico</h1>
+        <h1 class="text-center text-primary mb-4"><i class="fa fa-envelope"></i> Migración de correo electrónico</h1>
         <form id="migration_form">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3 class="card-title">Correo de Origen</h3>
+            <div class="row">
+                <!-- Formulario de Correo de Origen -->
+                <div class="col-md-6">
+                    <div class="card mb-4 border-primary">
+                        <div class="card-header bg-primary text-white">Correo de Origen</div>
+                        <div class="card-body">
+                            <div class="form-group position-relative mb-3">
+                                <i class="fa fa-server"></i>
+                                <label for="src_host">Servidor:</label>
+                                <input type="text" id="src_host" class="form-control" placeholder="Servidor de origen" required>
+                            </div>
+                            <div class="form-group position-relative mb-3">
+                                <i class="fa fa-plug"></i>
+                                <label for="src_port">Puerto:</label>
+                                <input type="number" id="src_port" class="form-control" placeholder="Puerto" required>
+                            </div>
+                            <div class="form-group position-relative mb-3">
+                                <i class="fa fa-user"></i>
+                                <label for="src_user">Usuario:</label>
+                                <input type="text" id="src_user" class="form-control" placeholder="Usuario de origen" required>
+                            </div>
+                            <div class="form-group position-relative mb-3">
+                                <i class="fa fa-lock"></i>
+                                <label for="src_password">Contraseña:</label>
+                                <input type="password" id="src_password" class="form-control" placeholder="Contraseña" required>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label for="src_encryption">Cifrado:</label>
+                                <select id="src_encryption" class="form-select">
+                                    <option value="none">Ninguno</option>
+                                    <option value="ssl">SSL</option>
+                                    <option value="tls">TLS</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="form-group">
-                        <label for="src_host">Servidor de origen:</label>
-                        <input type="text" id="src_host" name="src_host" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="src_user">Usuario de origen:</label>
-                        <input type="text" id="src_user" name="src_user" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="src_password">Contraseña de origen:</label>
-                        <input type="password" id="src_password" name="src_password" class="form-control" required>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="src_use_ssl" name="src_use_ssl">
-                        <label class="form-check-label" for="src_use_ssl">Usar SSL en el servidor de origen</label>
+
+                <!-- Formulario de Correo de Destino -->
+                <div class="col-md-6">
+                    <div class="card mb-4 border-success">
+                        <div class="card-header bg-success text-white">Correo de Destino</div>
+                        <div class="card-body">
+                            <div class="form-group position-relative mb-3">
+                                <i class="fa fa-server"></i>
+                                <label for="dst_host">Servidor:</label>
+                                <input type="text" id="dst_host" class="form-control" placeholder="Servidor de destino" required>
+                            </div>
+                            <div class="form-group position-relative mb-3">
+                                <i class="fa fa-plug"></i>
+                                <label for="dst_port">Puerto:</label>
+                                <input type="number" id="dst_port" class="form-control" placeholder="Puerto" required>
+                            </div>
+                            <div class="form-group position-relative mb-3">
+                                <i class="fa fa-user"></i>
+                                <label for="dst_user">Usuario:</label>
+                                <input type="text" id="dst_user" class="form-control" placeholder="Usuario de destino" required>
+                            </div>
+                            <div class="form-group position-relative mb-3">
+                                <i class="fa fa-lock"></i>
+                                <label for="dst_password">Contraseña:</label>
+                                <input type="password" id="dst_password" class="form-control" placeholder="Contraseña" required>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label for="dst_encryption">Cifrado:</label>
+                                <select id="dst_encryption" class="form-select">
+                                    <option value="none">Ninguno</option>
+                                    <option value="ssl">SSL</option>
+                                    <option value="tls">TLS</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3 class="card-title">Correo de Destino</h3>
+            <!-- Botón para iniciar la migración y spinner -->
+            <div class="text-center mt-4">
+                <button type="button" id="migrate_button" class="btn btn-primary me-3">
+                    <i class="fa fa-play"></i> Iniciar Migración
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="detectPortsBoth()">
+                    <i class="fa fa-search"></i> Detectar puertos
+                </button>
+                <div id="loading_spinner" class="spinner-border text-primary mt-3 d-none spinner-container" role="status">
+                    <span class="visually-hidden">Cargando...</span>
                 </div>
-                <div class="card-body">
-                    <div class="form-group">
-                        <label for="dst_host">Servidor de destino:</label>
-                        <input type="text" id="dst_host" name="dst_host" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="dst_user">Usuario de destino:</label>
-                        <input type="text" id="dst_user" name="dst_user" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="dst_password">Contraseña de destino:</label>
-                        <input type="password" id="dst_password" name="dst_password" class="form-control" required>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="dst_use_ssl" name="dst_use_ssl">
-                        <label class="form-check-label" for="dst_use_ssl">Usar SSL en el servidor de destino</label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="text-center">
-                <button type="button" id="migrate_button" class="btn btn-primary">Iniciar migración</button>
             </div>
         </form>
 
-        <h2 class="mt-4">Migraciones Actuales</h2>
-        <ul id="migration_list" class="list-group"></ul>
+        <!-- Sección de logs -->
+        <div id="log_section" class="mt-4 d-none">
+            <h3 class="text-center text-secondary" id="log_header">Progreso de la migración</h3>
+            <div id="log_container" class="border p-3 bg-light" style="height: 300px; overflow-y: auto; border-radius: 5px;">
+                <!-- Aquí se actualizarán los logs -->
+            </div>
+        </div>
 
-        <p id="migration_id" class="text-center mt-3"></p>
-        <div id="progress_text" class="text-center mt-3"></div>
+        <!-- Migraciones actuales -->
+        <h2 class="mt-4 text-center text-secondary">Migraciones Actuales</h2>
+        <ul id="migration_list" class="list-group"></ul>
     </div>
 </body>
 </html>
