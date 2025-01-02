@@ -1,0 +1,63 @@
+#!/bin/bash
+#Script elaborado por Adrian Alcantara Alvan
+#Todos los créditos de la herramienta MigrationToolImapsync para: Juan Carlos Mancera Suárez
+#Probado sobre AlmaLinux 9
+#Lima - Perú 2024
+
+# Configurar parámetros del kernel
+echo "vm.max_map_count=262144" >> /etc/sysctl.conf
+sysctl -p
+
+# Instalar utilidades de YUM y Docker
+yum install -y yum-utils
+yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Iniciar y habilitar Docker
+systemctl start docker
+systemctl enable docker
+
+# Descargar e instalar Docker Compose
+curl -L "https://github.com/docker/compose/releases/download/v2.12.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+
+docker-compose --version
+
+# Crear directorios para contenedores
+mkdir -p /var/lib/docker/imapsync/portainer
+mkdir -p /var/lib/docker/imapsync/imapsync
+
+# Configurar Portainer
+cd /var/lib/docker/imapsync/portainer
+bash -c 'cat > docker-compose.yml <<EOF
+version: "3.8"
+
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    ports:
+      - 9000:9000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    restart: always
+
+volumes:
+  portainer_data:
+EOF'
+
+# Levantar contenedor de Portainer
+docker-compose up -d
+
+dnf install git -y
+cd /var/lib/docker/imapsync/imapsync
+git clone https://github.com/CarlosSuarezCWH/MigrationToolImapsync.git
+cd MigrationToolImapsync
+docker build -t migrationtoolimapsync .
+docker run -d -p 5000:5000 migrationtoolimapsync
+
+
+# Validar contenedor
+docker ps
+docker images
